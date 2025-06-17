@@ -74,37 +74,38 @@ class RecParser:
         self.file_path = Path(file_path)
         if not self.file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
-    
-    def parse_line(self, line: str) -> Optional[LocationRecord]:
+
+    @staticmethod
+    def parse_line(line: str) -> Optional[LocationRecord]:
         """Parse a single line from the .rec file"""
         line = line.strip()
         if not line:
             return None
-        
+
         try:
             # Split on tabs - expecting: timestamp\t*\tjson_data
             parts = line.split('\t', 2)
             if len(parts) != 3:
                 return None
-            
+
             timestamp_str, asterisk, json_str = parts
-            
+
             # Validate format
             if asterisk.strip() != '*':
                 return None
-            
+
             # Parse timestamp
             timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-            
+
             # Parse JSON data
             data = json.loads(json_str)
-            
+
             return LocationRecord(timestamp=timestamp, data=data)
-            
+
         except (ValueError, json.JSONDecodeError) as e:
-            # Skip malformed lines
+            print(f"Skipping malformed line: {e}")
             return None
-    
+
     def parse_all(self) -> List[LocationRecord]:
         """Parse all records from the file"""
         records = []
@@ -172,39 +173,42 @@ def parse_rec_file(file_path: str) -> List[LocationRecord]:
     return parser.parse_all()
 
 
-if __name__ == "__main__":
+def cli_main():
     # Example usage
     import sys
-    
+
     if len(sys.argv) != 2:
         print("Usage: python recparse.py <path_to_rec_file>")
         sys.exit(1)
-    
+
     file_path = sys.argv[1]
     try:
         parser = RecParser(file_path)
         stats = parser.get_stats()
-        
+
         print(f"File: {file_path}")
         print(f"Total records: {stats['total_records']}")
         print(f"Valid coordinates: {stats['valid_coordinates']}")
-        
+
         if 'date_range' in stats:
             print(f"Date range: {stats['date_range']['start']} to {stats['date_range']['end']}")
-        
+
         if 'coordinate_bounds' in stats:
             bounds = stats['coordinate_bounds']
             print(f"Coordinate bounds:")
             print(f"  Latitude: {bounds['lat_min']:.6f} to {bounds['lat_max']:.6f}")
             print(f"  Longitude: {bounds['lon_min']:.6f} to {bounds['lon_max']:.6f}")
-        
+
         # Show first few records
         print(f"\nFirst 3 records:")
         for i, record in enumerate(parser.parse_iter()):
             if i >= 3:
                 break
             print(f"  {record.timestamp}: lat={record.latitude}, lon={record.longitude}, batt={record.battery}%")
-            
+
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)
+
+if __name__ == "__main__":
+    cli_main()

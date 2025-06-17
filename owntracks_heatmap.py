@@ -11,14 +11,23 @@ import os
 import sys
 import glob
 import pandas as pd
-from pathlib import Path
 
 # Import the recparse module
 from recparse import RecParser
 
 # Import reusable functions from the original strava tool
 sys.path.append('strava-local-heatmap-tool')
-exec(open('strava-local-heatmap-tool/strava-local-heatmap-tool.py').read())
+import importlib.util
+spec = importlib.util.spec_from_file_location("strava_tool", "strava-local-heatmap-tool/strava-local-heatmap-tool.py")
+strava_tool = importlib.util.module_from_spec(spec)
+sys.modules['strava_tool'] = strava_tool
+spec.loader.exec_module(strava_tool)
+
+# Import specific functions we need
+activities_geolocator = strava_tool.activities_geolocator
+strava_activities_heatmap = strava_tool.strava_activities_heatmap
+clean_names = strava_tool.clean_names
+from dateutil import parser as date_parser
 
 
 def owntracks_file_parse(*, file_path):
@@ -118,7 +127,7 @@ def owntracks_import(*, activities_directory, activities_file, skip_geolocation=
         ])
         # Change dtypes
         .astype(dtype={'activity_id': 'str'})
-        .assign(activity_date=lambda row: row['activity_date'].apply(parser.parse))
+        .assign(activity_date=lambda row: row['activity_date'].apply(date_parser.parse))
         # Transform columns (handle potential missing columns gracefully)
         .assign(
             elapsed_time=lambda row: row['elapsed_time'] / 60 if 'elapsed_time' in row.columns else 0,
@@ -133,7 +142,8 @@ def owntracks_import(*, activities_directory, activities_file, skip_geolocation=
     return activities_df, activities_coordinates_df
 
 
-def generate_owntracks_heatmap(*, activities_directory, activities_file, output_file='owntracks_heatmap.html', activity_colors=None, map_tile='dark_all'):
+def generate_owntracks_heatmap(*, activities_directory, activities_file, output_file='owntracks_heatmap.html',
+                               activity_colors=None, map_tile='dark_all'):
     """
     Generate a heatmap from OwnTracks data.
     

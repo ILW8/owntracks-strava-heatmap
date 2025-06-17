@@ -13,8 +13,6 @@ import glob
 import pandas as pd
 import math
 
-from line_profiler_pycharm import profile
-
 # Import the recparse module
 from recparse import RecParser
 
@@ -236,7 +234,6 @@ def owntracks_coordinates_import(*, activities_directory, activities_file_list=N
     return activities_coordinates_df
 
 
-@profile
 def create_segment_activities_metadata(activities_coordinates_df, original_activities_df):
     """
     Create activities metadata for segmented data (optimized).

@@ -480,12 +480,17 @@ def strava_activities_heatmap(
     # Plot activities into Folium map (adapted from: https://github.com/andyakrn/activities_heatmap)
     for activity_type in activities_coordinates_df['activity_type'].unique():
         df_activity_type = activities_coordinates_df[activities_coordinates_df['activity_type'] == activity_type]
+        
+        # Pre-group by activity_id for efficient lookup and to avoid repeated filtering
+        grouped_activities = df_activity_type.groupby('activity_id')
 
         for activity in df_activity_type['activity_id'].unique():
-            date = df_activity_type[df_activity_type['activity_id'] == activity]['datetime'].dt.date.iloc[0]
-            distance = round(df_activity_type[df_activity_type['activity_id'] == activity]['distance'].iloc[0] / 1000, 1)
+            group = grouped_activities.get_group(activity)
 
-            coordinates = tuple(df_activity_type[df_activity_type['activity_id'] == activity]['coordinates'])
+            date = group['datetime'].dt.date.iloc[0]
+            distance = round(group['distance'].iloc[0] / 1000, 1)
+            coordinates = tuple(group['coordinates'])
+
             folium.PolyLine(
                 locations=coordinates,
                 color=activity_colors[activity_type],

@@ -32,6 +32,7 @@ import gpxpy.gpx
 from janitor import clean_names
 import pandas as pd
 from tcxreader.tcxreader import TCXReader
+from tqdm import tqdm
 
 
 # Settings
@@ -484,7 +485,7 @@ def strava_activities_heatmap(
         # Pre-group by activity_id for efficient lookup and to avoid repeated filtering
         grouped_activities = df_activity_type.groupby('activity_id')
 
-        for activity in df_activity_type['activity_id'].unique():
+        for activity in tqdm(df_activity_type['activity_id'].unique(), desc=f"Plotting {activity_type}"):
             group = grouped_activities.get_group(activity)
 
             date = group['datetime'].dt.date.iloc[0]

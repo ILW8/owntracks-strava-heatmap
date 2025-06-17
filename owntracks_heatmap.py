@@ -54,7 +54,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return c * r
 
 
-def segment_gps_points(points, max_distance_m=300, max_time_s=60):
+def segment_gps_points(points, max_distance_m=300, max_time_s=60, min_points=5):
     """
     Split GPS points into segments based on distance and time thresholds.
     
@@ -62,6 +62,7 @@ def segment_gps_points(points, max_distance_m=300, max_time_s=60):
         points: List of LocationRecord objects with latitude, longitude, timestamp
         max_distance_m: Maximum distance between consecutive points (meters)
         max_time_s: Maximum time between consecutive points (seconds)
+        min_points: Minimum number of points required for a segment to be kept (default: 5)
     
     Returns:
         List of segments, where each segment is a list of LocationRecord objects
@@ -98,10 +99,18 @@ def segment_gps_points(points, max_distance_m=300, max_time_s=60):
     if current_segment:
         segments.append(current_segment)
     
-    return segments
+    # Filter out segments with fewer than min_points
+    filtered_segments = [segment for segment in segments if len(segment) >= min_points]
+    
+    # Report filtering if any segments were removed
+    if len(segments) > len(filtered_segments):
+        removed_count = len(segments) - len(filtered_segments)
+        print(f"Filtered out {removed_count} segment(s) with fewer than {min_points} points")
+    
+    return filtered_segments
 
 
-def owntracks_file_parse(*, file_path, enable_segmentation=True, max_distance_m=300, max_time_s=60):
+def owntracks_file_parse(*, file_path, enable_segmentation=True, max_distance_m=300, max_time_s=60, min_points=5):
     """Parse OwnTracks .rec files into a DataFrame with datetime, latitude, longitude, segment_id."""
     parsed_data = []
     
@@ -116,7 +125,7 @@ def owntracks_file_parse(*, file_path, enable_segmentation=True, max_distance_m=
                     valid_points.append(record)
             
             # Segment the points
-            segments = segment_gps_points(valid_points, max_distance_m, max_time_s)
+            segments = segment_gps_points(valid_points, max_distance_m, max_time_s, min_points)
             
             # Convert segments to data rows
             for segment_idx, segment_points in enumerate(segments):
@@ -148,7 +157,7 @@ def owntracks_file_parse(*, file_path, enable_segmentation=True, max_distance_m=
     return df
 
 
-def owntracks_coordinates_import(*, activities_directory, activities_file_list=None, enable_segmentation=True, max_distance_m=300, max_time_s=60):
+def owntracks_coordinates_import(*, activities_directory, activities_file_list=None, enable_segmentation=True, max_distance_m=300, max_time_s=60, min_points=5):
     """Import OwnTracks .rec files into a DataFrame, with optional activity segmentation."""
     # List of .rec files to be imported
     if activities_file_list is not None:
@@ -169,7 +178,8 @@ def owntracks_coordinates_import(*, activities_directory, activities_file_list=N
                 file_path=activities_file, 
                 enable_segmentation=enable_segmentation,
                 max_distance_m=max_distance_m,
-                max_time_s=max_time_s
+                max_time_s=max_time_s,
+                min_points=min_points
             )
             
             if df.empty:
@@ -296,7 +306,7 @@ def create_segment_activities_metadata(activities_coordinates_df, original_activ
 
 
 def owntracks_import(*, activities_directory, activities_file, skip_geolocation=True, 
-                     enable_segmentation=True, max_distance_m=300, max_time_s=60):
+                     enable_segmentation=True, max_distance_m=300, max_time_s=60, min_points=5):
     """
     Import OwnTracks activities and generate heatmap data.
     
@@ -322,7 +332,8 @@ def owntracks_import(*, activities_directory, activities_file, skip_geolocation=
         activities_file_list=activities_file_list,
         enable_segmentation=enable_segmentation,
         max_distance_m=max_distance_m,
-        max_time_s=max_time_s
+        max_time_s=max_time_s,
+        min_points=min_points
     )
     
     # Get geolocation (reuse from strava tool)
@@ -383,7 +394,7 @@ def owntracks_import(*, activities_directory, activities_file, skip_geolocation=
 
 def generate_owntracks_heatmap(*, activities_directory, activities_file, output_file='owntracks_heatmap.html',
                                activity_colors=None, map_tile='dark_all', enable_segmentation=True, 
-                               max_distance_m=300, max_time_s=60):
+                               max_distance_m=300, max_time_s=60, min_points=5):
     """
     Generate a heatmap from OwnTracks data.
     
@@ -396,13 +407,14 @@ def generate_owntracks_heatmap(*, activities_directory, activities_file, output_
     - enable_segmentation: Whether to segment activities based on gaps
     - max_distance_m: Maximum distance between consecutive points (meters)
     - max_time_s: Maximum time between consecutive points (seconds)
+    - min_points: Minimum number of points required for a segment to be kept (default: 5)
     """
     if activity_colors is None:
         activity_colors = {'OwnTracks': '#FF6600'}
     
     print("Loading OwnTracks data...")
     if enable_segmentation:
-        print(f"Activity segmentation enabled: max distance {max_distance_m}m, max time {max_time_s}s")
+        print(f"Activity segmentation enabled: max distance {max_distance_m}m, max time {max_time_s}s, min points {min_points}")
     
     # Import activities and coordinates
     activities_df, activities_coordinates_df = owntracks_import(
@@ -411,7 +423,8 @@ def generate_owntracks_heatmap(*, activities_directory, activities_file, output_
         skip_geolocation=True,
         enable_segmentation=enable_segmentation,
         max_distance_m=max_distance_m,
-        max_time_s=max_time_s
+        max_time_s=max_time_s,
+        min_points=min_points
     )
     
     print(f"Loaded {len(activities_df)} activities")
@@ -449,6 +462,7 @@ if __name__ == "__main__":
     parser.add_argument('--no-segmentation', action='store_true', help='Disable activity segmentation based on gaps')
     parser.add_argument('--max-distance', type=int, default=300, help='Maximum distance between consecutive points in meters (default: 300)')
     parser.add_argument('--max-time', type=int, default=60, help='Maximum time between consecutive points in seconds (default: 60)')
+    parser.add_argument('--min-points', type=int, default=5, help='Minimum number of points required for a segment to be kept (default: 5)')
     
     args = parser.parse_args()
     
@@ -462,7 +476,8 @@ if __name__ == "__main__":
         map_tile=args.tile,
         enable_segmentation=not args.no_segmentation,
         max_distance_m=args.max_distance,
-        max_time_s=args.max_time
+        max_time_s=args.max_time,
+        min_points=args.min_points
     )
     
     if success:

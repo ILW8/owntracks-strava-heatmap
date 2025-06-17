@@ -46,7 +46,7 @@ python owntracks_heatmap.py \
 
 ### Activity segmentation (improved GPS visualization):
 ```bash
-# Default segmentation (300m distance, 60s time gaps)
+# Default segmentation (300m distance, 60s time gaps, 5 min points)
 python owntracks_heatmap.py --activities-directory activities --activities-file activities.csv
 
 # Custom thresholds for segmentation
@@ -54,7 +54,14 @@ python owntracks_heatmap.py \
   --activities-directory activities \
   --activities-file activities.csv \
   --max-distance 500 \
-  --max-time 120
+  --max-time 120 \
+  --min-points 10
+
+# Filter out very small segments (outliers)
+python owntracks_heatmap.py \
+  --activities-directory activities \
+  --activities-file activities.csv \
+  --min-points 3
 
 # Disable segmentation (original behavior)
 python owntracks_heatmap.py --activities-directory activities --activities-file activities.csv --no-segmentation

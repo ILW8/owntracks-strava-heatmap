@@ -298,7 +298,7 @@ def create_segment_activities_metadata(activities_coordinates_df, original_activ
 
 
 def owntracks_import(*, activities_directory, activities_file, skip_geolocation=True, 
-                     enable_segmentation=True, max_distance_m=300, max_time_s=60, min_points=5, use_heatmap=False):
+                     enable_segmentation=True, max_distance_m=300, max_time_s=60, min_points=5):
     """
     Import OwnTracks activities and generate heatmap data.
     
@@ -317,25 +317,15 @@ def owntracks_import(*, activities_directory, activities_file, skip_geolocation=
     
     # Get list of .rec files from activities.csv
     activities_file_list = original_activities_df['filename'].tolist()
-    
-    # Override segmentation settings for heatmap mode
-    if use_heatmap:
-        # For heatmaps, we want all GPS points regardless of segmentation
-        final_enable_segmentation = False
-        final_min_points = 1  # Keep all points, even single isolated ones
-        print("Heatmap mode: disabling segmentation and minimum points filtering")
-    else:
-        final_enable_segmentation = enable_segmentation
-        final_min_points = min_points
-    
+
     # Import .rec activity files into a DataFrame with segmentation
     activities_coordinates_df = owntracks_coordinates_import(
         activities_directory=activities_directory,
         activities_file_list=activities_file_list,
-        enable_segmentation=final_enable_segmentation,
+        enable_segmentation=enable_segmentation,
         max_distance_m=max_distance_m,
         max_time_s=max_time_s,
-        min_points=final_min_points
+        min_points=min_points
     )
     
     # Get geolocation (reuse from strava tool)
@@ -396,8 +386,7 @@ def owntracks_import(*, activities_directory, activities_file, skip_geolocation=
 
 def generate_owntracks_heatmap(*, activities_directory, activities_file, output_file='owntracks_heatmap.html',
                                activity_colors=None, map_tile='dark_all', enable_segmentation=True, 
-                               max_distance_m=300, max_time_s=60, min_points=5, use_heatmap=False,
-                               heatmap_radius=15, heatmap_blur=10, heatmap_min_opacity=0.4):
+                               max_distance_m=300, max_time_s=60, min_points=5):
     """
     Generate a heatmap from OwnTracks data.
     
@@ -411,16 +400,12 @@ def generate_owntracks_heatmap(*, activities_directory, activities_file, output_
     - max_distance_m: Maximum distance between consecutive points (meters)
     - max_time_s: Maximum time between consecutive points (seconds)
     - min_points: Minimum number of points required for a segment to be kept (default: 5)
-    - use_heatmap: Whether to use heatmap visualization instead of track lines
-    - heatmap_radius: Radius of each heatmap point (default: 15)
-    - heatmap_blur: Blur factor for heatmap (default: 10)
-    - heatmap_min_opacity: Minimum opacity for heatmap (default: 0.4)
     """
     if activity_colors is None:
         activity_colors = {'OwnTracks': '#FF6600'}
     
     print("Loading OwnTracks data...")
-    if enable_segmentation and not use_heatmap:
+    if enable_segmentation:
         print(f"Activity segmentation enabled: max distance {max_distance_m}m, max time {max_time_s}s, min points {min_points}")
     
     # Import activities and coordinates
@@ -431,8 +416,7 @@ def generate_owntracks_heatmap(*, activities_directory, activities_file, output_
         enable_segmentation=enable_segmentation,
         max_distance_m=max_distance_m,
         max_time_s=max_time_s,
-        min_points=min_points,
-        use_heatmap=use_heatmap
+        min_points=min_points
     )
     
     print(f"Loaded {len(activities_df)} activities")
@@ -442,11 +426,6 @@ def generate_owntracks_heatmap(*, activities_directory, activities_file, output_
         print("Generating heatmap...")
         
         # Create heatmap using the original strava function
-        if use_heatmap:
-            print("Using heatmap mode...")
-        else:
-            print("Using track mode...")
-            
         strava_activities_heatmap(
             activities_df=activities_df,
             activities_coordinates_df=activities_coordinates_df,
@@ -456,11 +435,7 @@ def generate_owntracks_heatmap(*, activities_directory, activities_file, output_
             line_opacity=0.3,
             line_smooth_factor=0.9,
             map_zoom_start=12,
-            map_tile=map_tile,
-            use_heatmap=use_heatmap,
-            heatmap_radius=heatmap_radius,
-            heatmap_blur=heatmap_blur,
-            heatmap_min_opacity=heatmap_min_opacity
+            map_tile=map_tile
         )
         
         print(f"Heatmap generated: {output_file}")
@@ -484,10 +459,6 @@ if __name__ == "__main__":
     parser.add_argument('--max-distance', type=int, default=300, help='Maximum distance between consecutive points in meters (default: 300)')
     parser.add_argument('--max-time', type=int, default=60, help='Maximum time between consecutive points in seconds (default: 60)')
     parser.add_argument('--min-points', type=int, default=5, help='Minimum number of points required for a segment to be kept (default: 5)')
-    parser.add_argument('--heatmap', action='store_true', help='Use heatmap visualization instead of track lines')
-    parser.add_argument('--heatmap-radius', type=int, default=15, help='Radius of each heatmap point (default: 15)')
-    parser.add_argument('--heatmap-blur', type=int, default=10, help='Blur factor for heatmap (default: 10)')
-    parser.add_argument('--heatmap-opacity', type=float, default=0.4, help='Minimum opacity for heatmap (default: 0.4)')
     
     args = parser.parse_args()
     
@@ -502,11 +473,7 @@ if __name__ == "__main__":
         enable_segmentation=not args.no_segmentation,
         max_distance_m=args.max_distance,
         max_time_s=args.max_time,
-        min_points=args.min_points,
-        use_heatmap=args.heatmap,
-        heatmap_radius=args.heatmap_radius,
-        heatmap_blur=args.heatmap_blur,
-        heatmap_min_opacity=args.heatmap_opacity
+        min_points=args.min_points
     )
     
     if success:

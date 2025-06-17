@@ -163,3 +163,8 @@ cython_debug/
 #.idea/
 
 data/
+
+# Generated files
+*.html
+strava-local-heatmap-tool/activities/
+strava-local-heatmap-tool/activities.csv

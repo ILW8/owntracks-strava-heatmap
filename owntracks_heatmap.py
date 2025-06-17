@@ -148,10 +148,15 @@ def owntracks_file_parse(*, file_path, enable_segmentation=True, max_distance_m=
     return df
 
 
-def owntracks_coordinates_import(*, activities_directory, enable_segmentation=True, max_distance_m=300, max_time_s=60):
+def owntracks_coordinates_import(*, activities_directory, activities_file_list=None, enable_segmentation=True, max_distance_m=300, max_time_s=60):
     """Import OwnTracks .rec files into a DataFrame, with optional activity segmentation."""
     # List of .rec files to be imported
-    activities_files = glob.glob(pathname=os.path.join(activities_directory, '*.rec'), recursive=False)
+    if activities_file_list is not None:
+        # Only load files listed in activities.csv
+        activities_files = [os.path.join(activities_directory, filename) for filename in activities_file_list if filename.endswith('.rec')]
+    else:
+        # Fallback to original behavior (load all .rec files)
+        activities_files = glob.glob(pathname=os.path.join(activities_directory, '*.rec'), recursive=False)
     
     # Collect all DataFrames for efficient concatenation
     dataframes = []
@@ -297,18 +302,7 @@ def owntracks_import(*, activities_directory, activities_file, skip_geolocation=
     
     Similar to the strava activities_import function but designed for OwnTracks data.
     """
-    # Import .rec activity files into a DataFrame with segmentation
-    activities_coordinates_df = owntracks_coordinates_import(
-        activities_directory=activities_directory,
-        enable_segmentation=enable_segmentation,
-        max_distance_m=max_distance_m,
-        max_time_s=max_time_s
-    )
-    
-    # Get geolocation (reuse from strava tool)
-    activities_geolocation_df = activities_geolocator(activities_coordinates_df=activities_coordinates_df, skip_geolocation=skip_geolocation)
-    
-    # Import original activities CSV
+    # Import original activities CSV to get list of files to process
     original_activities_df = pd.read_csv(filepath_or_buffer=activities_file, sep=',', header=0, index_col=None, skiprows=0, skipfooter=0, dtype=None, engine='python', encoding='utf-8', keep_default_na=True)
     
     # Clean column names
@@ -318,6 +312,21 @@ def owntracks_import(*, activities_directory, activities_file, skip_geolocation=
     original_activities_df = original_activities_df.assign(
         filename=lambda row: row['filename'].replace(to_replace=r'^activities/|\.gz$', value='', regex=True)
     )
+    
+    # Get list of .rec files from activities.csv
+    activities_file_list = original_activities_df['filename'].tolist()
+    
+    # Import .rec activity files into a DataFrame with segmentation
+    activities_coordinates_df = owntracks_coordinates_import(
+        activities_directory=activities_directory,
+        activities_file_list=activities_file_list,
+        enable_segmentation=enable_segmentation,
+        max_distance_m=max_distance_m,
+        max_time_s=max_time_s
+    )
+    
+    # Get geolocation (reuse from strava tool)
+    activities_geolocation_df = activities_geolocator(activities_coordinates_df=activities_coordinates_df, skip_geolocation=skip_geolocation)
     
     # Create segment activities metadata
     activities_df = create_segment_activities_metadata(activities_coordinates_df, original_activities_df)

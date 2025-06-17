@@ -502,8 +502,9 @@ def strava_activities_heatmap(
                     radius=heatmap_radius,
                     blur=heatmap_blur,
                     min_opacity=heatmap_min_opacity,
-                    max_zoom=heatmap_max_zoom,
+                    max_zoom=0,
                     overlay=True,
+                    control=False,
                 ).add_to(activities_map)
     else:
         # Track mode: create polylines for each activity (original behavior)

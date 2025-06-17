@@ -13,6 +13,8 @@ import glob
 import pandas as pd
 import math
 
+from line_profiler_pycharm import profile
+
 # Import the recparse module
 from recparse import RecParser
 
@@ -151,8 +153,8 @@ def owntracks_coordinates_import(*, activities_directory, enable_segmentation=Tr
     # List of .rec files to be imported
     activities_files = glob.glob(pathname=os.path.join(activities_directory, '*.rec'), recursive=False)
     
-    # Create empty DataFrame
-    activities_coordinates_df = pd.DataFrame(data=None, index=None, dtype='str')
+    # Collect all DataFrames for efficient concatenation
+    dataframes = []
     
     # Import activities
     for activities_file in activities_files:
@@ -172,24 +174,23 @@ def owntracks_coordinates_import(*, activities_directory, enable_segmentation=Tr
             base_filename = activities_file
             base_filename = base_filename.replace(activities_directory, '').lstrip('/\\')
             
-            # Create unique filename for each segment
+            # Create unique filename for each segment (optimized)
             if 'segment_id' in df.columns:
-                def create_segment_filename(row):
-                    if enable_segmentation and df['segment_id'].nunique() > 1:
-                        return f"{base_filename}#{row['segment_id']}"
-                    else:
-                        return base_filename
-                
-                df['filename'] = df.apply(create_segment_filename, axis=1)
+                # Calculate once per file instead of once per row
+                num_segments = df['segment_id'].nunique()
+                if enable_segmentation and num_segments > 1:
+                    # Use vectorized string operations instead of apply
+                    df['filename'] = base_filename + '#' + df['segment_id'].astype(str)
+                else:
+                    df['filename'] = base_filename
             else:
                 df['filename'] = base_filename
             
-            # Concatenate DataFrame
-            activities_coordinates_df = pd.concat(objs=[activities_coordinates_df, df], axis=0, ignore_index=False, sort=False)
+            # Add DataFrame to list for efficient concatenation
+            dataframes.append(df)
             
             # Print segmentation info
             if enable_segmentation and 'segment_id' in df.columns:
-                num_segments = df['segment_id'].nunique()
                 if num_segments > 1:
                     print(f"Segmented {base_filename} into {num_segments} activities")
             
@@ -197,25 +198,33 @@ def owntracks_coordinates_import(*, activities_directory, enable_segmentation=Tr
             print(f"Error parsing {activities_file}: {e}")
             pass
     
-    # Filter columns (keep segment_id for debugging if present)
-    available_columns = ['datetime', 'filename', 'latitude', 'longitude']
-    if not activities_coordinates_df.empty and 'segment_id' in activities_coordinates_df.columns:
-        available_columns.append('segment_id')
-    
-    activities_coordinates_df = activities_coordinates_df.filter(items=available_columns)
-    
-    # Remove rows without latitude/longitude
-    if not activities_coordinates_df.empty and 'latitude' in activities_coordinates_df.columns:
-        activities_coordinates_df = activities_coordinates_df[activities_coordinates_df['latitude'].notna()]
+    # Efficient concatenation of all DataFrames at once
+    if dataframes:
+        activities_coordinates_df = pd.concat(dataframes, axis=0, ignore_index=True, sort=False)
+
+        # Filter columns (keep segment_id for debugging if present)
+        available_columns = ['datetime', 'filename', 'latitude', 'longitude']
+        if 'segment_id' in activities_coordinates_df.columns:
+            available_columns.append('segment_id')
+        
+        activities_coordinates_df = activities_coordinates_df.filter(items=available_columns)
+        
+        # Remove rows without latitude/longitude
+        if 'latitude' in activities_coordinates_df.columns:
+            activities_coordinates_df = activities_coordinates_df[activities_coordinates_df['latitude'].notna()]
+        else:
+            print('No activities with GPS data (latitude/longitude) found.')
     else:
         print('No activities with GPS data (latitude/longitude) found.')
+        activities_coordinates_df = pd.DataFrame()
     
     return activities_coordinates_df
 
 
+@profile
 def create_segment_activities_metadata(activities_coordinates_df, original_activities_df):
     """
-    Create activities metadata for segmented data.
+    Create activities metadata for segmented data (optimized).
     
     Args:
         activities_coordinates_df: DataFrame with coordinates and segmented filenames
@@ -224,10 +233,16 @@ def create_segment_activities_metadata(activities_coordinates_df, original_activ
     Returns:
         DataFrame with activities metadata for each segment
     """
-    segment_activities = []
-    
     # Get unique filenames from coordinates (these include segment info like "file.rec#0")
     unique_filenames = activities_coordinates_df['filename'].unique()
+    
+    # Pre-index original activities for faster lookup
+    original_lookup = {row['filename']: row for _, row in original_activities_df.iterrows()}
+    
+    # Pre-compute datetime minimums for all filenames using groupby (MASSIVE speedup)
+    datetime_mins = activities_coordinates_df.groupby('filename')['datetime'].min()
+    
+    segment_activities = []
     
     for segment_filename in unique_filenames:
         # Extract base filename (remove segment suffix)
@@ -238,12 +253,12 @@ def create_segment_activities_metadata(activities_coordinates_df, original_activ
             base_filename = segment_filename
             segment_id = 0
         
-        # Find original metadata for this file
-        original_row = original_activities_df[original_activities_df['filename'] == base_filename]
+        # Fast lookup using pre-built index
+        original_row = original_lookup.get(base_filename)
         
-        if not original_row.empty:
+        if original_row is not None:
             # Use original metadata as template
-            row_data = original_row.iloc[0].to_dict()
+            row_data = original_row.to_dict() if hasattr(original_row, 'to_dict') else dict(original_row)
             
             # Modify for segment
             row_data['filename'] = segment_filename
@@ -254,9 +269,9 @@ def create_segment_activities_metadata(activities_coordinates_df, original_activ
             segment_activities.append(row_data)
         else:
             # Create default metadata for segments without original data
-            coords_for_file = activities_coordinates_df[activities_coordinates_df['filename'] == segment_filename]
-            if not coords_for_file.empty:
-                first_timestamp = coords_for_file['datetime'].min()
+            # Use pre-computed datetime minimum (eliminates 30ms per lookup!)
+            first_timestamp = datetime_mins.get(segment_filename)
+            if first_timestamp is not None:
                 activity_date = first_timestamp.strftime('%Y-%m-%d') if pd.notna(first_timestamp) else '1970-01-01'
                 
                 segment_activities.append({

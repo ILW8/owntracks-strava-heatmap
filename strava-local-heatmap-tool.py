@@ -25,6 +25,7 @@ import webbrowser
 from dateutil import parser
 from fitparse import FitFile
 import folium
+from folium.plugins import HeatMap
 from geopy.extra.rate_limiter import RateLimiter
 from geopy.geocoders import Nominatim
 import gpxpy
@@ -421,6 +422,11 @@ def strava_activities_heatmap(
     line_weight=1.0,
     line_opacity=0.6,
     line_smooth_factor=1.0,
+    use_heatmap=False,
+    heatmap_radius=15,
+    heatmap_blur=10,
+    heatmap_min_opacity=0.4,
+    heatmap_max_zoom=18,
 ):
     """Create Heatmap based on inputted activities DataFrame."""
     activities_df = (
@@ -478,53 +484,75 @@ def strava_activities_heatmap(
     )
     folium.LayerControl().add_to(activities_map)
 
-    # Plot activities into Folium map (adapted from: https://github.com/andyakrn/activities_heatmap)
-    for activity_type in activities_coordinates_df['activity_type'].unique():
-        df_activity_type = activities_coordinates_df[activities_coordinates_df['activity_type'] == activity_type]
-        
-        # Pre-group by activity_id for efficient lookup and to avoid repeated filtering
-        grouped_activities = df_activity_type.groupby('activity_id')
+    # Plot activities into Folium map
+    if use_heatmap:
+        # Heatmap mode: create heatmaps for each activity type
+        for activity_type in activities_coordinates_df['activity_type'].unique():
+            df_activity_type = activities_coordinates_df[activities_coordinates_df['activity_type'] == activity_type]
+            
+            # Convert coordinates to heatmap format: [[lat, lon, intensity], ...]
+            # Use intensity of 1.0 for all points (can be customized later)
+            heatmap_data = [[row['latitude'], row['longitude'], 1.0] 
+                           for _, row in df_activity_type.iterrows()]
+            
+            if heatmap_data:  # Only create heatmap if we have data
+                HeatMap(
+                    heatmap_data,
+                    name=f'{activity_type} Heatmap',
+                    radius=heatmap_radius,
+                    blur=heatmap_blur,
+                    min_opacity=heatmap_min_opacity,
+                    max_zoom=heatmap_max_zoom,
+                    overlay=True,
+                ).add_to(activities_map)
+    else:
+        # Track mode: create polylines for each activity (original behavior)
+        for activity_type in activities_coordinates_df['activity_type'].unique():
+            df_activity_type = activities_coordinates_df[activities_coordinates_df['activity_type'] == activity_type]
+            
+            # Pre-group by activity_id for efficient lookup and to avoid repeated filtering
+            grouped_activities = df_activity_type.groupby('activity_id')
 
-        for activity in tqdm(df_activity_type['activity_id'].unique(), desc=f"Plotting {activity_type}"):
-            group = grouped_activities.get_group(activity)
+            for activity in tqdm(df_activity_type['activity_id'].unique(), desc=f"Plotting {activity_type}"):
+                group = grouped_activities.get_group(activity)
 
-            date = group['datetime'].dt.date.iloc[0]
-            distance = round(group['distance'].iloc[0] / 1000, 1)
-            coordinates = tuple(group['coordinates'])
+                date = group['datetime'].dt.date.iloc[0]
+                distance = round(group['distance'].iloc[0] / 1000, 1)
+                coordinates = tuple(group['coordinates'])
 
-            folium.PolyLine(
-                locations=coordinates,
-                color=activity_colors[activity_type],
-                weight=line_weight,
-                opacity=line_opacity,
-                control=True,
-                name=activity_type,
-                popup=folium.Popup(
-                    html=(
-                        'Activity type: '
-                        + activity_type
-                        + '<br>'
-                        + 'Date: '
-                        + str(date)
-                        + '<br>'
-                        + 'Distance: '
-                        + str(distance)
-                        + ' km'
-                        + '<br>'
-                        + '<br>'
-                        + '<a href=https://www.strava.com/activities/'
-                        + str(activity)
-                        + '>'
-                        + 'Open in Strava'
-                        + '</a>'
+                folium.PolyLine(
+                    locations=coordinates,
+                    color=activity_colors[activity_type],
+                    weight=line_weight,
+                    opacity=line_opacity,
+                    control=True,
+                    name=activity_type,
+                    popup=folium.Popup(
+                        html=(
+                            'Activity type: '
+                            + activity_type
+                            + '<br>'
+                            + 'Date: '
+                            + str(date)
+                            + '<br>'
+                            + 'Distance: '
+                            + str(distance)
+                            + ' km'
+                            + '<br>'
+                            + '<br>'
+                            + '<a href=https://www.strava.com/activities/'
+                            + str(activity)
+                            + '>'
+                            + 'Open in Strava'
+                            + '</a>'
+                        ),
+                        min_width=100,
+                        max_width=100,
                     ),
-                    min_width=100,
-                    max_width=100,
-                ),
-                tooltip=activity_type,
-                smooth_factor=line_smooth_factor,
-                overlay=True,
-            ).add_to(activities_map)
+                    tooltip=activity_type,
+                    smooth_factor=line_smooth_factor,
+                    overlay=True,
+                ).add_to(activities_map)
 
     # Save to .html file
     activities_map.save(outfile=strava_activities_heatmap_output_path)

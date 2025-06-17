@@ -17,12 +17,7 @@ import math
 from recparse import RecParser
 
 # Import reusable functions from the original strava tool
-sys.path.append('strava-local-heatmap-tool')
-import importlib.util
-spec = importlib.util.spec_from_file_location("strava_tool", "strava-local-heatmap-tool/strava-local-heatmap-tool.py")
-strava_tool = importlib.util.module_from_spec(spec)
-sys.modules['strava_tool'] = strava_tool
-spec.loader.exec_module(strava_tool)
+import strava_local_heatmap_tool as strava_tool
 
 # Import specific functions we need
 activities_geolocator = strava_tool.activities_geolocator

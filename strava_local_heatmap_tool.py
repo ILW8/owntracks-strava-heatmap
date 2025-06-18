@@ -453,29 +453,69 @@ def strava_activities_heatmap(
     # Transform columns
     activities_coordinates_df['coordinates'] = list(zip(activities_coordinates_df['latitude'], activities_coordinates_df['longitude']))
 
-    # Define map tile
-    if map_tile in ['dark_all', 'dark_nolabels', 'light_all', 'light_nolabels']:
-        map_tile = 'https://a.basemaps.cartocdn.com/' + map_tile + '/{z}/{x}/{y}@2x.png'
-
-    if map_tile == 'terrain_background':
-        map_tile = 'http://tile.stamen.com/terrain-background/{z}/{x}/{y}.png'
-
-    if map_tile == 'toner_lite':
-        map_tile = 'http://tile.stamen.com/toner-lite/{z}/{x}/{y}.png'
-
-    if map_tile == 'ocean_basemap':
-        map_tile = 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}'
-
     # Create Folium map
     activities_map = folium.Map(
-        tiles=map_tile,
-        attr='tile',
+        tiles=None,
         location=[
             round(activities_coordinates_df['latitude'].median(), 4),
             round(activities_coordinates_df['longitude'].median(), 4),
         ],
         zoom_start=map_zoom_start,
     )
+
+    # Define valid map tiles
+    valid_tiles = ['dark_all', 'dark_nolabels', 'light_all', 'light_nolabels', 'toner_lite', 'terrain_background', 'ocean_basemap']
+    
+    folium.TileLayer(
+        name="Carto dark_all",
+        tiles='https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        attr='carto_dark_all',
+        control=True,
+        show=(map_tile == 'dark_all' or map_tile not in valid_tiles),
+    ).add_to(activities_map)
+    folium.TileLayer(
+        name="Carto dark_nolabels",
+        tiles='https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png',
+        attr='carto_dark_nolabels',
+        control=True,
+        show=(map_tile == 'dark_nolabels'),
+    ).add_to(activities_map)
+    folium.TileLayer(
+        name="Carto light_all",
+        tiles='https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        attr='carto_light_all',
+        control=True,
+        show=(map_tile == 'light_all'),
+    ).add_to(activities_map)
+    folium.TileLayer(
+        name="Carto light_nolabels",
+        tiles='https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}@2x.png',
+        attr='carto_light_nolabels',
+        control=True,
+        show=(map_tile == 'light_nolabels'),
+    ).add_to(activities_map)
+    folium.TileLayer(
+        name="Stamen toner-lite",
+        tiles="https://tiles.stadiamaps.com/tiles/stamen_toner-lite/{z}/{x}/{y}.png",
+        attr='stadiamaps',
+        control=True,
+        show=(map_tile == 'toner_lite'),
+    ).add_to(activities_map)
+    folium.TileLayer(
+        name="Stamen terrain-background",
+        tiles="https://tiles.stadiamaps.com/tiles/stamen_terrain-background/{z}/{x}/{y}.png",
+        attr='stadiamaps',
+        control=True,
+        show=(map_tile == 'terrain_background'),
+    ).add_to(activities_map)
+    folium.TileLayer(
+        name="Ocean Basemap",
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}',
+        attr='esri',
+        control=True,
+        show=(map_tile == 'ocean_basemap'),
+    ).add_to(activities_map)
+
     folium.LayerControl().add_to(activities_map)
 
     # Plot activities into Folium map (adapted from: https://github.com/andyakrn/activities_heatmap)

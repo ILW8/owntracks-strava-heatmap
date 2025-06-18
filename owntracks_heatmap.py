@@ -8,21 +8,11 @@ OwnTracks .rec file support.
 """
 
 import os
-import sys
 import glob
 import pandas as pd
 import math
-
-# Import the recparse module
 from recparse import RecParser
-
-# Import reusable functions from the original strava tool
-import strava_local_heatmap_tool as strava_tool
-
-# Import specific functions we need
-activities_geolocator = strava_tool.activities_geolocator
-strava_activities_heatmap = strava_tool.strava_activities_heatmap
-clean_names = strava_tool.clean_names
+from strava_local_heatmap_tool import activities_geolocator, strava_activities_heatmap, clean_names
 from dateutil import parser as date_parser
 
 

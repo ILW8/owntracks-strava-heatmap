@@ -463,58 +463,57 @@ def strava_activities_heatmap(
         zoom_start=map_zoom_start,
     )
 
-    # Define valid map tiles
-    valid_tiles = ['dark_all', 'dark_nolabels', 'light_all', 'light_nolabels', 'toner_lite', 'terrain_background', 'ocean_basemap']
-    
-    folium.TileLayer(
-        name="Carto dark_all",
-        tiles='https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        attr='carto_dark_all',
-        control=True,
-        show=(map_tile == 'dark_all' or map_tile not in valid_tiles),
-    ).add_to(activities_map)
-    folium.TileLayer(
-        name="Carto dark_nolabels",
-        tiles='https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png',
-        attr='carto_dark_nolabels',
-        control=True,
-        show=(map_tile == 'dark_nolabels'),
-    ).add_to(activities_map)
-    folium.TileLayer(
-        name="Carto light_all",
-        tiles='https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        attr='carto_light_all',
-        control=True,
-        show=(map_tile == 'light_all'),
-    ).add_to(activities_map)
-    folium.TileLayer(
-        name="Carto light_nolabels",
-        tiles='https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}@2x.png',
-        attr='carto_light_nolabels',
-        control=True,
-        show=(map_tile == 'light_nolabels'),
-    ).add_to(activities_map)
-    folium.TileLayer(
-        name="Stamen toner-lite",
-        tiles="https://tiles.stadiamaps.com/tiles/stamen_toner-lite/{z}/{x}/{y}.png",
-        attr='stadiamaps',
-        control=True,
-        show=(map_tile == 'toner_lite'),
-    ).add_to(activities_map)
-    folium.TileLayer(
-        name="Stamen terrain-background",
-        tiles="https://tiles.stadiamaps.com/tiles/stamen_terrain-background/{z}/{x}/{y}.png",
-        attr='stadiamaps',
-        control=True,
-        show=(map_tile == 'terrain_background'),
-    ).add_to(activities_map)
-    folium.TileLayer(
-        name="Ocean Basemap",
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}',
-        attr='esri',
-        control=True,
-        show=(map_tile == 'ocean_basemap'),
-    ).add_to(activities_map)
+    # Define tile configurations
+    tile_configs = {
+        'dark_all': {
+            'name': 'Carto dark_all',
+            'tiles': 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+            'attr': 'carto_dark_all',
+        },
+        'dark_nolabels': {
+            'name': 'Carto dark_nolabels',
+            'tiles': 'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png',
+            'attr': 'carto_dark_nolabels',
+        },
+        'light_all': {
+            'name': 'Carto light_all',
+            'tiles': 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+            'attr': 'carto_light_all',
+        },
+        'light_nolabels': {
+            'name': 'Carto light_nolabels',
+            'tiles': 'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}@2x.png',
+            'attr': 'carto_light_nolabels',
+        },
+        'toner_lite': {
+            'name': 'Stamen toner-lite',
+            'tiles': 'https://tiles.stadiamaps.com/tiles/stamen_toner-lite/{z}/{x}/{y}.png',
+            'attr': 'stadiamaps',
+        },
+        'terrain_background': {
+            'name': 'Stamen terrain-background',
+            'tiles': 'https://tiles.stadiamaps.com/tiles/stamen_terrain-background/{z}/{x}/{y}.png',
+            'attr': 'stadiamaps',
+        },
+        'ocean_basemap': {
+            'name': 'Ocean Basemap',
+            'tiles': 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}',
+            'attr': 'esri',
+        },
+    }
+
+    # Create tile layers
+    for tile_key, config in tile_configs.items():
+        # Show this tile if it matches map_tile, or show dark_all as default if map_tile is invalid
+        show = (tile_key == map_tile) or (tile_key == 'dark_all' and map_tile not in tile_configs)
+        
+        folium.TileLayer(
+            name=config['name'],
+            tiles=config['tiles'],
+            attr=config['attr'],
+            control=True,
+            show=show,
+        ).add_to(activities_map)
 
     folium.LayerControl().add_to(activities_map)
 

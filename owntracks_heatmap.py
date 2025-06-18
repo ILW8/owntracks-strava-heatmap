@@ -181,16 +181,15 @@ def owntracks_coordinates_import(*, activities_directory, activities_file_list=N
                     df['filename'] = base_filename + '#' + df['segment_id'].astype(str)
                 else:
                     df['filename'] = base_filename
+                
+                # Print segmentation info
+                if enable_segmentation and num_segments > 1:
+                    print(f"Segmented {base_filename} into {num_segments} activities")
             else:
                 df['filename'] = base_filename
             
             # Add DataFrame to list for efficient concatenation
             dataframes.append(df)
-            
-            # Print segmentation info
-            if enable_segmentation and 'segment_id' in df.columns:
-                if num_segments > 1:
-                    print(f"Segmented {base_filename} into {num_segments} activities")
             
         except Exception as e:
             print(f"Error parsing {activities_file}: {e}")

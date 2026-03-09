@@ -5,9 +5,8 @@ Generate interactive heatmaps from OwnTracks location data using the same visual
 ## Prerequisites
 
 1. **OwnTracks .rec files** - Your location tracking data from OwnTracks
-2. **Python dependencies** - Install from strava-local-heatmap-tool:
+2. **Python dependencies** - Install from the project root:
    ```bash
-   cd strava-local-heatmap-tool
    pip install -r requirements.txt
    ```
 
@@ -47,6 +46,10 @@ python owntracks_heatmap.py \
 - `--output` - Output HTML filename (default: `owntracks_heatmap.html`)
 - `--color` - Color for tracks in hex format (default: `#FF6600`)
 - `--tile` - Map tile style (default: `dark_all`)
+- `--no-segmentation` - Disable activity segmentation based on GPS gaps
+- `--max-distance` - Maximum distance between consecutive points in meters (default: `300`)
+- `--max-time` - Maximum time between consecutive points in seconds (default: `60`)
+- `--min-points` - Minimum number of points required for a segment to be kept (default: `5`)
 
 ### Python Library Usage
 
@@ -67,6 +70,4 @@ The tool generates an interactive HTML file that you can open in any web browser
 
 ## Dependencies
 
-This tool reuses functions from [strava-local-heatmap-tool](https://github.com/remisalmon/strava-local-heatmap-tool) and requires:
-- The `strava-local-heatmap-tool/` directory in the same location
-- The `recparse.py` OwnTracks parser module
+This tool reuses functions from [strava-local-heatmap-tool](https://github.com/remisalmon/strava-local-heatmap-tool) via the local `strava_local_heatmap_tool.py` module. All required packages are listed in `requirements.txt`.

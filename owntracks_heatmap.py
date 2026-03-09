@@ -12,8 +12,7 @@ import glob
 import pandas as pd
 import math
 from recparse import RecParser
-from strava_local_heatmap_tool import activities_geolocator, strava_activities_heatmap, clean_names
-from dateutil import parser as date_parser
+from strava_local_heatmap_tool import activities_geolocator, strava_activities_heatmap
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -140,15 +139,10 @@ def owntracks_file_parse(*, file_path, enable_segmentation=True, max_distance_m=
     return df
 
 
-def owntracks_coordinates_import(*, activities_directory, activities_file_list=None, enable_segmentation=True, max_distance_m=300, max_time_s=60, min_points=5):
+def owntracks_coordinates_import(*, activities_directory, enable_segmentation=True, max_distance_m=300, max_time_s=60, min_points=5):
     """Import OwnTracks .rec files into a DataFrame, with optional activity segmentation."""
-    # List of .rec files to be imported
-    if activities_file_list is not None:
-        # Only load files listed in activities.csv
-        activities_files = [os.path.join(activities_directory, filename) for filename in activities_file_list if filename.endswith('.rec')]
-    else:
-        # Fallback to original behavior (load all .rec files)
-        activities_files = glob.glob(pathname=os.path.join(activities_directory, '*.rec'), recursive=False)
+    # Discover all .rec files in the directory
+    activities_files = glob.glob(pathname=os.path.join(activities_directory, '*.rec'), recursive=False)
     
     # Collect all DataFrames for efficient concatenation
     dataframes = []
@@ -218,28 +212,24 @@ def owntracks_coordinates_import(*, activities_directory, activities_file_list=N
     return activities_coordinates_df
 
 
-def create_segment_activities_metadata(activities_coordinates_df, original_activities_df):
+def create_segment_activities_metadata(activities_coordinates_df):
     """
-    Create activities metadata for segmented data (optimized).
-    
+    Create activities metadata from coordinate data.
+
     Args:
         activities_coordinates_df: DataFrame with coordinates and segmented filenames
-        original_activities_df: DataFrame with original activities metadata
-        
+
     Returns:
         DataFrame with activities metadata for each segment
     """
     # Get unique filenames from coordinates (these include segment info like "file.rec#0")
     unique_filenames = activities_coordinates_df['filename'].unique()
-    
-    # Pre-index original activities for faster lookup
-    original_lookup = {row['filename']: row for _, row in original_activities_df.iterrows()}
-    
-    # Pre-compute datetime minimums for all filenames using groupby (MASSIVE speedup)
+
+    # Pre-compute datetime minimums for all filenames using groupby
     datetime_mins = activities_coordinates_df.groupby('filename')['datetime'].min()
-    
+
     segment_activities = []
-    
+
     for segment_filename in unique_filenames:
         # Extract base filename (remove segment suffix)
         if '#' in segment_filename:
@@ -248,140 +238,97 @@ def create_segment_activities_metadata(activities_coordinates_df, original_activ
         else:
             base_filename = segment_filename
             segment_id = 0
-        
-        # Fast lookup using pre-built index
-        original_row = original_lookup.get(base_filename)
-        
-        if original_row is not None:
-            # Use original metadata as template
-            row_data = original_row.to_dict() if hasattr(original_row, 'to_dict') else dict(original_row)
-            
-            # Modify for segment
-            row_data['filename'] = segment_filename
-            row_data['activity_id'] = f"{row_data['activity_id']}_{segment_id}" if segment_id > 0 else row_data['activity_id']
-            if segment_id > 0:
-                row_data['activity_name'] = f"{row_data['activity_name']} (Segment {segment_id + 1})"
-            
-            segment_activities.append(row_data)
-        else:
-            # Create default metadata for segments without original data
-            # Use pre-computed datetime minimum (eliminates 30ms per lookup!)
-            first_timestamp = datetime_mins.get(segment_filename)
-            if first_timestamp is not None:
-                activity_date = first_timestamp.strftime('%Y-%m-%d') if pd.notna(first_timestamp) else '1970-01-01'
-                
-                segment_activities.append({
-                    'activity_date': activity_date,
-                    'activity_type': 'OwnTracks',
-                    'activity_id': f"owntracks_{segment_filename.replace('.', '_').replace('#', '_')}",
-                    'activity_name': f"OwnTracks {base_filename}" + (f" (Segment {segment_id + 1})" if segment_id > 0 else ""),
-                    'filename': segment_filename,
-                    'elapsed_time': 0,
-                    'moving_time': 0,
-                    'max_speed': 0,
-                    'average_speed': 0,
-                    'elevation_gain': 0,
-                })
-    
+
+        first_timestamp = datetime_mins.get(segment_filename)
+        if first_timestamp is not None:
+            activity_date = first_timestamp.strftime('%Y-%m-%d') if pd.notna(first_timestamp) else '1970-01-01'
+
+            segment_activities.append({
+                'activity_date': activity_date,
+                'activity_type': 'OwnTracks',
+                'activity_id': f"owntracks_{segment_filename.replace('.', '_').replace('#', '_')}",
+                'activity_name': f"OwnTracks {base_filename}" + (f" (Segment {segment_id + 1})" if segment_id > 0 else ""),
+                'filename': segment_filename,
+                'elapsed_time': 0.0,
+                'moving_time': 0.0,
+                'max_speed': 0.0,
+                'average_speed': 0.0,
+                'elevation_gain': 0.0,
+            })
+
     return pd.DataFrame(segment_activities)
 
 
-def owntracks_import(*, activities_directory, activities_file, skip_geolocation=True, 
+def owntracks_import(*, activities_directory, skip_geolocation=True,
                      enable_segmentation=True, max_distance_m=300, max_time_s=60, min_points=5):
     """
     Import OwnTracks activities and generate heatmap data.
-    
-    Similar to the strava activities_import function but designed for OwnTracks data.
-    """
-    # Import original activities CSV to get list of files to process
-    original_activities_df = pd.read_csv(filepath_or_buffer=activities_file, sep=',', header=0, index_col=None, skiprows=0, skipfooter=0, dtype=None, engine='python', encoding='utf-8', keep_default_na=True)
-    
-    # Clean column names
-    original_activities_df = clean_names(original_activities_df)
-    
-    # Clean filename column in original data
-    original_activities_df = original_activities_df.assign(
-        filename=lambda row: row['filename'].replace(to_replace=r'^activities/|\.gz$', value='', regex=True)
-    )
-    
-    # Get list of .rec files from activities.csv
-    activities_file_list = original_activities_df['filename'].tolist()
 
+    Discovers all .rec files in activities_directory and generates metadata
+    automatically from GPS data.
+    """
     # Import .rec activity files into a DataFrame with segmentation
     activities_coordinates_df = owntracks_coordinates_import(
         activities_directory=activities_directory,
-        activities_file_list=activities_file_list,
         enable_segmentation=enable_segmentation,
         max_distance_m=max_distance_m,
         max_time_s=max_time_s,
         min_points=min_points
     )
-    
+
     # Get geolocation (reuse from strava tool)
     activities_geolocation_df = activities_geolocator(activities_coordinates_df=activities_coordinates_df, skip_geolocation=skip_geolocation)
-    
-    # Create segment activities metadata
-    activities_df = create_segment_activities_metadata(activities_coordinates_df, original_activities_df)
-    
+
+    # Create activities metadata from coordinates
+    activities_df = create_segment_activities_metadata(activities_coordinates_df)
+
     # Merge with geolocation data
     activities_df = (
         activities_df
         .merge(right=activities_geolocation_df, how='left', on=['filename'], indicator=False)
-        # Remove problematic columns
         .drop(columns=['distance', 'commute'], axis=1, errors='ignore')
-        # Select essential columns (handle missing columns gracefully)
     )
-    
+
     # Ensure required columns exist
     required_columns = [
         'activity_date', 'activity_type', 'activity_id', 'activity_name',
         'filename', 'elapsed_time', 'moving_time', 'max_speed', 'average_speed',
         'elevation_gain'
     ]
-    
-    # Add missing columns with default values
+
     for col in required_columns:
         if col not in activities_df.columns:
             activities_df[col] = 0 if col in ['elapsed_time', 'moving_time', 'max_speed', 'average_speed', 'elevation_gain'] else ''
-    
+
     # Add geolocation columns if they exist
     geolocation_columns = [
         'activity_location_country_code', 'activity_location_country',
         'activity_location_state', 'activity_location_city', 'activity_location_postal_code',
         'activity_location_latitude', 'activity_location_longitude'
     ]
-    
+
     available_columns = required_columns + [col for col in geolocation_columns if col in activities_df.columns]
     activities_df = activities_df.filter(items=available_columns)
-    
+
     # Clean up data types and format
     activities_df = (
         activities_df
         .astype(dtype={'activity_id': 'str'})
-        .assign(activity_date=lambda row: row['activity_date'].apply(date_parser.parse))
-        # Transform columns (handle potential missing columns gracefully)
-        .assign(
-            elapsed_time=lambda row: row['elapsed_time'] / 60 if 'elapsed_time' in row.columns else 0,
-            moving_time=lambda row: row['moving_time'] / 60 if 'moving_time' in row.columns else 0,
-            max_speed=lambda row: row['max_speed'] * 3.6 if 'max_speed' in row.columns else 0,
-            average_speed=lambda row: row['average_speed'] * 3.6 if 'average_speed' in row.columns else 0
-        )
-        # Sort by date
+        .assign(activity_date=lambda row: pd.to_datetime(row['activity_date']))
         .sort_values(by=['activity_date', 'activity_type'], ignore_index=True)
     )
-    
+
     return activities_df, activities_coordinates_df
 
 
-def generate_owntracks_heatmap(*, activities_directory, activities_file, output_file='owntracks_heatmap.html',
-                               activity_colors=None, map_tile='dark_all', enable_segmentation=True, 
+def generate_owntracks_heatmap(*, activities_directory, output_file='owntracks_heatmap.html',
+                               activity_colors=None, map_tile='dark_all', enable_segmentation=True,
                                max_distance_m=300, max_time_s=60, min_points=5):
     """
     Generate a heatmap from OwnTracks data.
-    
+
     Parameters:
     - activities_directory: Directory containing .rec files
-    - activities_file: CSV file with activity metadata
     - output_file: Output HTML file name
     - activity_colors: Dictionary mapping activity types to colors
     - map_tile: Map tile style
@@ -392,15 +339,14 @@ def generate_owntracks_heatmap(*, activities_directory, activities_file, output_
     """
     if activity_colors is None:
         activity_colors = {'OwnTracks': '#FF6600'}
-    
+
     print("Loading OwnTracks data...")
     if enable_segmentation:
         print(f"Activity segmentation enabled: max distance {max_distance_m}m, max time {max_time_s}s, min points {min_points}")
-    
+
     # Import activities and coordinates
     activities_df, activities_coordinates_df = owntracks_import(
         activities_directory=activities_directory,
-        activities_file=activities_file,
         skip_geolocation=True,
         enable_segmentation=enable_segmentation,
         max_distance_m=max_distance_m,
@@ -440,7 +386,6 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Generate heatmaps from OwnTracks .rec files')
     parser.add_argument('--activities-directory', default='activities', help='Directory containing .rec files')
-    parser.add_argument('--activities-file', default='activities.csv', help='CSV file with activity metadata')
     parser.add_argument('--output', default='owntracks_heatmap.html', help='Output HTML file')
     parser.add_argument('--color', default='#FF6600', help='Color for OwnTracks activities')
     parser.add_argument('--tile', default='dark_all', help='Map tile style')
@@ -455,7 +400,6 @@ if __name__ == "__main__":
     
     success = generate_owntracks_heatmap(
         activities_directory=args.activities_directory,
-        activities_file=args.activities_file,
         output_file=args.output,
         activity_colors=activity_colors,
         map_tile=args.tile,

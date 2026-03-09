@@ -13,7 +13,6 @@ Generate interactive heatmaps from OwnTracks location data using the same visual
 
 ## Data Preparation
 
-### 1. Organize .rec files
 Place your OwnTracks .rec files in a directory (e.g., `activities/`):
 ```
 activities/
@@ -22,23 +21,7 @@ activities/
 └── 2024-03.rec
 ```
 
-### 2. Create activities.csv
-Create a CSV file with metadata for your .rec files:
-
-```csv
-Activity Date,Activity Type,Activity ID,Activity Name,Filename,Elapsed Time,Moving Time,Distance,Max Speed,Average Speed,Elevation Gain
-2024-01-01,OwnTracks,1,January 2024,2024-01.rec,0,0,0,0,0,0
-2024-02-01,OwnTracks,2,February 2024,2024-02.rec,0,0,0,0,0,0
-2024-03-01,OwnTracks,3,March 2024,2024-03.rec,0,0,0,0,0,0
-```
-
-**Required columns:**
-- `Activity Date` - Date in YYYY-MM-DD format
-- `Activity Type` - Activity type (e.g., "OwnTracks")
-- `Activity ID` - Unique identifier
-- `Activity Name` - Descriptive name
-- `Filename` - Must match your .rec filenames
-- Other columns can be set to 0 for OwnTracks data
+All `.rec` files in the directory will be automatically discovered and metadata (activity date, name, etc.) will be generated from the GPS data.
 
 ## Usage
 
@@ -46,14 +29,13 @@ Activity Date,Activity Type,Activity ID,Activity Name,Filename,Elapsed Time,Movi
 
 Generate a heatmap with default settings:
 ```bash
-python owntracks_heatmap.py --activities-directory activities --activities-file activities.csv
+python owntracks_heatmap.py --activities-directory activities
 ```
 
 Customize output and styling:
 ```bash
 python owntracks_heatmap.py \
   --activities-directory path/to/rec/files \
-  --activities-file path/to/activities.csv \
   --output my_heatmap.html \
   --color "#FF6600" \
   --tile dark_all
@@ -62,7 +44,6 @@ python owntracks_heatmap.py \
 ### CLI Options
 
 - `--activities-directory` - Directory containing .rec files (default: `activities`)
-- `--activities-file` - CSV file with activity metadata (default: `activities.csv`)
 - `--output` - Output HTML filename (default: `owntracks_heatmap.html`)
 - `--color` - Color for tracks in hex format (default: `#FF6600`)
 - `--tile` - Map tile style (default: `dark_all`)
@@ -74,7 +55,6 @@ from owntracks_heatmap import generate_owntracks_heatmap
 
 success = generate_owntracks_heatmap(
     activities_directory='activities',
-    activities_file='activities.csv',
     output_file='my_heatmap.html',
     activity_colors={'OwnTracks': '#FF6600'},
     map_tile='dark_all'

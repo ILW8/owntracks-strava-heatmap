@@ -14,7 +14,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/owntracks_heatmap.py" />
-    <option name="PARAMETERS" value="--activities-directory data/382a3113-c26c-4600-a036-43b5af14244c/ --activities-file data/activities-may2025.csv --output output/ot-latest.html --max-distance 200 --max-time 60 --min-points 24" />
+    <option name="PARAMETERS" value="--activities-directory data/382a3113-c26c-4600-a036-43b5af14244c/ --output output/ot-latest.html --max-distance 200 --max-time 60 --min-points 24" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

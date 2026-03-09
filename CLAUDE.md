@@ -31,14 +31,13 @@ Key dependencies include: fitparse, folium, geopy, gpxpy, pandas, pyjanitor, pyt
 
 ### Run the main tool:
 ```bash
-python owntracks_heatmap.py --activities-directory activities --activities-file activities.csv
+python owntracks_heatmap.py --activities-directory activities
 ```
 
 ### Custom output and styling:
 ```bash
 python owntracks_heatmap.py \
   --activities-directory path/to/rec/files \
-  --activities-file path/to/activities.csv \
   --output my_heatmap.html \
   --color "#FF6600" \
   --tile dark_all
@@ -47,12 +46,11 @@ python owntracks_heatmap.py \
 ### Activity segmentation (improved GPS visualization):
 ```bash
 # Default segmentation (300m distance, 60s time gaps, 5 min points)
-python owntracks_heatmap.py --activities-directory activities --activities-file activities.csv
+python owntracks_heatmap.py --activities-directory activities
 
 # Custom thresholds for segmentation
 python owntracks_heatmap.py \
   --activities-directory activities \
-  --activities-file activities.csv \
   --max-distance 500 \
   --max-time 120 \
   --min-points 10
@@ -60,11 +58,10 @@ python owntracks_heatmap.py \
 # Filter out very small segments (outliers)
 python owntracks_heatmap.py \
   --activities-directory activities \
-  --activities-file activities.csv \
   --min-points 3
 
 # Disable segmentation (original behavior)
-python owntracks_heatmap.py --activities-directory activities --activities-file activities.csv --no-segmentation
+python owntracks_heatmap.py --activities-directory activities --no-segmentation
 ```
 
 ### Parse individual .rec files:
@@ -79,8 +76,7 @@ python -c "from recparse import RecParser; parser = RecParser('data/sample.rec')
 
 ## Data Format
 
-- **Input**: OwnTracks .rec files in `data/` directory with format: `timestamp\t*\t{json_payload}`
-- **Metadata**: CSV file with columns: Activity Date, Activity Type, Activity ID, Activity Name, Filename, plus optional metric columns
+- **Input**: OwnTracks .rec files in a directory with format: `timestamp\t*\t{json_payload}`
 - **Output**: Interactive HTML files with folium-based heatmaps
 
 ## Key Functions

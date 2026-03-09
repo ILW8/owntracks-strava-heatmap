@@ -1,3 +1,4 @@
+# For owntracks usage info, go to [README-owntracks.md](./README-owntracks.md)
 # Strava Local Heatmap Tool
 
 ## Description
